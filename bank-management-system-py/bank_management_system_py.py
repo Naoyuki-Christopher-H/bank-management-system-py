@@ -2,205 +2,232 @@
 import time
 from typing import Dict, Union, Optional
 
-# Global storage for all accounts
-accounts: Dict[int, Dict[str, Union[str, float]]] = {}
+# ────────────────────────────────────────────────
+# Data
+# ────────────────────────────────────────────────
 
-# Currently selected / working account (for nicer UX)
+accounts: Dict[int, Dict[str, Union[str, float]]] = {}
 current_account_number: Optional[int] = None
 
 
 def clear_screen() -> None:
-    """Clear the terminal screen (works on Windows, macOS, Linux)."""
     os.system('cls' if os.name == 'nt' else 'clear')
 
 
-def generate_account_number() -> int:
-    """Generate next sequential account number."""
+def next_account_number() -> int:
     return len(accounts) + 1
 
 
 def create_account(name: str, initial_balance: float) -> int:
-    """Create new account. Returns account number."""
-    if not name.strip():
-        raise ValueError("Name cannot be empty")
+    name = name.strip()
+    if not name:
+        raise ValueError("Please enter a name")
     if initial_balance < 0:
-        raise ValueError("Initial balance cannot be negative")
+        raise ValueError("Initial deposit cannot be negative")
 
-    acc_num = generate_account_number()
-    accounts[acc_num] = {
-        'name': name.strip(),
+    number = next_account_number()
+    accounts[number] = {
+        'name': name,
         'balance': float(initial_balance)
     }
-    return acc_num
+    return number
 
 
-def get_account(acc_num: int) -> Dict[str, Union[str, float]]:
-    """Get account data or raise KeyError if not found."""
-    if acc_num not in accounts:
-        raise KeyError(f"Account #{acc_num} does not exist")
-    return accounts[acc_num]
+def get_account(number: int) -> Dict[str, Union[str, float]]:
+    if number not in accounts:
+        raise KeyError(f"Account #{number} not found")
+    return accounts[number]
 
 
-def deposit(acc_num: int, amount: float) -> float:
-    """Deposit money. Returns new balance."""
+def deposit(number: int, amount: float) -> float:
     if amount <= 0:
-        raise ValueError("Deposit amount must be positive")
-    acc = get_account(acc_num)
-    acc['balance'] += amount
-    return acc['balance']
+        raise ValueError("Please enter an amount greater than zero")
+    account = get_account(number)
+    account['balance'] += amount
+    return account['balance']
 
 
-def withdraw(acc_num: int, amount: float) -> float:
-    """Withdraw money. Returns new balance."""
+def withdraw(number: int, amount: float) -> float:
     if amount <= 0:
-        raise ValueError("Withdrawal amount must be positive")
-    acc = get_account(acc_num)
-    if acc['balance'] < amount:
-        raise ValueError(f"Insufficient funds (available: {acc['balance']:.2f})")
-    acc['balance'] -= amount
-    return acc['balance']
+        raise ValueError("Please enter an amount greater than zero")
+    account = get_account(number)
+    if account['balance'] < amount:
+        raise ValueError(f"Insufficient funds • Available: {account['balance']:,.2f}")
+    account['balance'] -= amount
+    return account['balance']
 
 
-def show_header() -> None:
-    """Display program title and current account (if selected)."""
-    print("═" * 50)
-    print("          SIMPLE BANKING SYSTEM          ")
-    print("═" * 50)
+# ────────────────────────────────────────────────
+# UI Helpers
+# ────────────────────────────────────────────────
+
+def print_header() -> None:
+    clear_screen()
+    print("")
 
     if current_account_number and current_account_number in accounts:
         acc = accounts[current_account_number]
-        print(f"Current account: #{current_account_number}")
-        print(f"  Holder : {acc['name']}")
-        print(f"  Balance: {acc['balance']:,.2f}")
+        print("  " + "─" * 46)
+        print(f"  Account #{current_account_number}")
+        print(f"  {acc['name']}")
+        print(f"  Balance  {acc['balance']:,.2f}")
+        print("  " + "─" * 46)
     else:
-        print("No account selected")
-    print("═" * 50)
-    print()
+        print("  " + "─" * 46)
+        print("  No account selected")
+        print("  " + "─" * 46)
+
+    print("")
 
 
-def show_menu() -> None:
-    """Display main menu options."""
+def print_menu() -> None:
     print("  1. Create new account")
-    print("  2. Select / switch account")
-    print("  3. Deposit money")
-    print("  4. Withdraw money")
-    print("  5. Check balance (detailed)")
-    print("  6. Exit")
-    print("-" * 50)
+    print("  2. Switch account")
+    print("  3. Deposit")
+    print("  4. Withdraw")
+    print("  5. View balance details")
+    print("  6. Quit")
+    print("")
 
 
-def main():
+def pause(seconds: float = 1.8) -> None:
+    time.sleep(seconds)
+
+
+# ────────────────────────────────────────────────
+# Actions
+# ────────────────────────────────────────────────
+
+def action_create_account() -> None:
+    print_header()
+    print("  New Account\n")
+    name = input("  Full name: ").strip()
+
+    try:
+        initial = float(input("  Initial deposit: "))
+        number = create_account(name, initial)
+        global current_account_number
+        current_account_number = number
+
+        print_header()
+        print("  Account created successfully\n")
+        print(f"  Number     {number}")
+        print(f"  Holder     {name}")
+        print(f"  Balance    {initial:,.2f}\n")
+        pause(2.8)
+
+    except ValueError as e:
+        print(f"\n  {e}\n")
+        pause()
+
+
+def action_select_account() -> None:
+    print_header()
+
+    if not accounts:
+        print("  No accounts yet. Create one first.\n")
+        pause()
+        return
+
+    print("  Existing accounts\n")
+    for num, data in sorted(accounts.items()):
+        print(f"  {num:3d}   {data['name']:<24} {data['balance']:>12,.2f}")
+
+    print("")
+    try:
+        num = int(input("  Account number: "))
+        get_account(num)  # validate
+        global current_account_number
+        current_account_number = num
+        print_header()
+        print("  Account switched\n")
+        pause(1.4)
+    except (ValueError, KeyError) as e:
+        print(f"\n  {e}\n")
+        pause()
+
+
+def action_deposit() -> None:
+    print_header()
+    print("  Deposit\n")
+    try:
+        amount = float(input("  Amount: "))
+        new_balance = deposit(current_account_number, amount)  # type: ignore
+        print(f"\n  Deposited {amount:,.2f}")
+        print(f"  New balance {new_balance:,.2f}\n")
+        pause()
+    except ValueError as e:
+        print(f"\n  {e}\n")
+        pause()
+
+
+def action_withdraw() -> None:
+    print_header()
+    print("  Withdraw\n")
+    try:
+        amount = float(input("  Amount: "))
+        new_balance = withdraw(current_account_number, amount)  # type: ignore
+        print(f"\n  Withdrew {amount:,.2f}")
+        print(f"  New balance {new_balance:,.2f}\n")
+        pause()
+    except ValueError as e:
+        print(f"\n  {e}\n")
+        pause()
+
+
+def action_show_details() -> None:
+    print_header()
+    acc = get_account(current_account_number)  # type: ignore
+    print("  Account Details\n")
+    print(f"  Number     {current_account_number}")
+    print(f"  Holder     {acc['name']}")
+    print(f"  Balance    {acc['balance']:,.2f}\n")
+    input("  Press Enter to continue ")
+
+
+# ────────────────────────────────────────────────
+# Main Loop
+# ────────────────────────────────────────────────
+
+def main() -> None:
     global current_account_number
 
     while True:
-        clear_screen()
-        show_header()
-        show_menu()
+        print_header()
+        print_menu()
 
-        try:
-            choice = input("Enter choice (1-6): ").strip()
+        choice = input("  → ").strip()
 
-            if choice == '1':
-                clear_screen()
-                show_header()
-                name = input("Full name: ").strip()
-                try:
-                    initial = float(input("Initial deposit amount: "))
-                    acc_num = create_account(name, initial)
-                    current_account_number = acc_num   # auto-select new account
-                    clear_screen()
-                    show_header()
-                    print("╔════════════════════════════════════╗")
-                    print("║         ACCOUNT CREATED            ║")
-                    print("╚════════════════════════════════════╝")
-                    print(f"  Account number : {acc_num}")
-                    print(f"  Holder          : {name}")
-                    print(f"  Balance         : {initial:,.2f}")
-                    print()
-                except ValueError as e:
-                    print(f"Error: {e}")
-                time.sleep(2.5)
+        if choice == "1":
+            action_create_account()
 
-            elif choice == '2':
-                clear_screen()
-                show_header()
-                if not accounts:
-                    print("No accounts exist yet. Create one first.")
-                else:
-                    print("Existing accounts:")
-                    for num, data in sorted(accounts.items()):
-                        print(f"  #{num:3d}  {data['name']:<20}  {data['balance']:>12,.2f}")
-                    print()
-                    try:
-                        num = int(input("Enter account number to select: "))
-                        get_account(num)  # validate
-                        current_account_number = num
-                        clear_screen()
-                        show_header()
-                        print("Account switched successfully.")
-                    except (ValueError, KeyError) as e:
-                        print(f"Error: {e}")
-                time.sleep(2)
+        elif choice == "2":
+            action_select_account()
 
-            elif choice in ('3', '4', '5'):
-                if current_account_number is None:
-                    clear_screen()
-                    show_header()
-                    print("No account selected! Please select an account first (option 2).")
-                    time.sleep(2.5)
-                    continue
+        elif choice in ("3", "4", "5"):
+            if current_account_number is None:
+                print_header()
+                print("  Please select an account first\n")
+                pause(2)
+                continue
 
-                clear_screen()
-                show_header()
+            if choice == "3":
+                action_deposit()
+            elif choice == "4":
+                action_withdraw()
+            elif choice == "5":
+                action_show_details()
 
-                if choice == '3':
-                    try:
-                        amt = float(input("Amount to deposit: "))
-                        new_bal = deposit(current_account_number, amt)
-                        print(f"Successfully deposited {amt:,.2f}")
-                        print(f"New balance: {new_bal:,.2f}")
-                    except ValueError as e:
-                        print(f"Error: {e}")
-                    time.sleep(2)
-
-                elif choice == '4':
-                    try:
-                        amt = float(input("Amount to withdraw: "))
-                        new_bal = withdraw(current_account_number, amt)
-                        print(f"Successfully withdrew {amt:,.2f}")
-                        print(f"New balance: {new_bal:,.2f}")
-                    except ValueError as e:
-                        print(f"Error: {e}")
-                    time.sleep(2)
-
-                elif choice == '5':
-                    acc = get_account(current_account_number)
-                    print("Balance details:")
-                    print(f"  Account  : #{current_account_number}")
-                    print(f"  Holder   : {acc['name']}")
-                    print(f"  Balance  : {acc['balance']:,.2f}")
-                    print()
-                    input("Press Enter to continue...")
-
-            elif choice == '6':
-                clear_screen()
-                print("Thank you for using Simple Banking System.")
-                print("Goodbye!\n")
-                break
-
-            else:
-                print("Invalid choice. Please enter 1–6.")
-                time.sleep(1.8)
-
-        except KeyboardInterrupt:
+        elif choice == "6":
             clear_screen()
-            print("\nProgram terminated by user.")
+            print("\n  Thank you for using Simple Banking.\n")
+            print("  Goodbye.\n")
             break
-        except Exception as e:
-            clear_screen()
-            show_header()
-            print(f"Unexpected error: {e}")
-            time.sleep(3)
+
+        else:
+            print_header()
+            print("  Please choose 1–6\n")
+            pause(1.4)
 
 
 if __name__ == "__main__":
@@ -208,4 +235,4 @@ if __name__ == "__main__":
         main()
     except KeyboardInterrupt:
         clear_screen()
-        print("Goodbye.")
+        print("\n  Goodbye.\n")
